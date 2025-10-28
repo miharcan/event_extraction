@@ -1,0 +1,28 @@
+# 🧠 Event Extraction
+
+A lightweight Python prototype for detecting and classifying events from short texts or news headlines using simple NLP and semantic similarity techniques.
+
+---
+
+## 🚀 Overview
+This project demonstrates a basic event extraction pipeline that:
+- Identifies event types (e.g. explosion, protest, earthquake) using TF-IDF similarity  
+- Extracts named entities (locations, GPEs) via **spaCy**  
+- Optionally links entities using cosine similarity and builds small event graphs with **NetworkX**
+
+---
+
+## 📦 Features
+- **Semantic event detection** using TF-IDF and cosine similarity  
+- **String-based keyword matching** as fallback extraction  
+- **Named Entity Recognition (NER)** for geographic entities  
+- **Knowledge graph visualization** of events and locations  
+
+---
+
+## 🧰 Requirements
+Install dependencies:
+```bash
+pip install spacy scikit-learn pandas numpy networkx matplotlib
+python -m spacy download en_core_web_sm
+
