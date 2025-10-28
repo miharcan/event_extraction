@@ -1,4 +1,6 @@
 import spacy
+import re
+from typing import List, Dict
 
 #python -m spacy download en_core_web_sm
 nlp = spacy.load("en_core_web_sm")
@@ -17,12 +19,12 @@ event_keywords = {
 }
 
 
-def extract_events(texts, event_dict):
+def extract_events(texts:List[str], event_dict: Dict[str, str]) -> List[Dict]:
     results = []
     for text in texts:
         events = []
         for word, label in event_dict.items():
-            if word in text.lower():
+            if re.search(rf'\b{word}\d', text.lower()):
                 events.append(label)
         
         doc = nlp(text)
@@ -31,7 +33,9 @@ def extract_events(texts, event_dict):
             if ent.label_ == "GPE":
                 propn.append(ent.text)
 
-        results.append({"headline": text, "events":events, "propns":propn})
+        events = list(set(events))
+        propn = list(set(propn))
+        results.append({"headline": text, "events":events, "entities":propn})
     return results
 
 print(extract_events(headlines, event_keywords))
