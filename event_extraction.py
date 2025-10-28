@@ -24,7 +24,7 @@ def extract_events(texts:List[str], event_dict: Dict[str, str]) -> List[Dict]:
     for text in texts:
         events = []
         for word, label in event_dict.items():
-            if re.search(rf'\b{word}\d', text.lower()):
+            if re.search(rf'\b{word}\b', text.lower()):
                 events.append(label)
         
         doc = nlp(text)
