@@ -2,13 +2,14 @@ import networkx as nx
 
 events = [
     {"event": "Explosion", "location": "Beirut", "time": "2020-08-04"},
-    {"event": "Protest", "location": "Paris", "time": "2023-05-01"}
+    {"event": "Protest", "location": "Beirut", "time": "2023-05-01"}
 ]
 
 G = nx.DiGraph()
 for e in events:
     G.add_node(e["event"], type="event")
     G.add_node(e["location"], type="location")
+    
     G.add_edge(e["event"], e["location"], relation="occurred_in")
 
 import matplotlib.pyplot as plt

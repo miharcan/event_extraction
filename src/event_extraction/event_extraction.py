@@ -39,6 +39,7 @@ def detect_event(text, tfidf_matrix, vectoriser, labels, threshold=0.25):
     return "New event:", sim[indx] 
     
 
+
 def extract_events_semantic(texts:List[str]):
     results = []
     for text in texts:
