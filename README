@@ -1,29 +1,35 @@
-# 🧠 Event Extraction
+# 🧠 Event Extraction & Knowledge Graph Builder
 
-A lightweight Python prototype for detecting and classifying events from short texts or news headlines using simple NLP and semantic similarity techniques.
+This project demonstrates lightweight NLP methods for detecting events, linking entities, and visualizing relationships from text or news data.
 
 ---
 
 ## 🚀 Overview
-This project demonstrates a basic event extraction pipeline that:
-- Identifies event types (e.g. explosion, protest, earthquake) using TF-IDF similarity  
-- Extracts named entities (locations, GPEs) via **spaCy**  
-- Optionally links entities using cosine similarity and builds small event graphs with **NetworkX**
 
-![Knowledge Graph](src/knowgraph/output/linked_kg.png)
----
+The codebase combines three main components:
 
-## 📦 Features
-- **Semantic event detection** using TF-IDF and cosine similarity  
-- **String-based keyword matching** as fallback extraction  
-- **Named Entity Recognition (NER)** for geographic entities  
-- **Knowledge graph visualization** of events and locations  
+1. **Event Extraction** – Detects and classifies events from short texts or headlines using TF-IDF similarity and keyword matching.
+2. **Semantic Search & Explanation** – Uses transformer embeddings (Sentence-BERT) and GPT-Neo to find and explain relationships between humanitarian event texts.
+3. **Knowledge Graph Generation** – Builds and visualizes a directed graph of subjects, verbs, and objects extracted from live news articles using the NewsAPI.
 
 ---
 
-## 🧰 Requirements
-Install dependencies:
+## 🧩 Features
+- Named Entity Recognition (NER) via **spaCy**
+- Semantic similarity with **SentenceTransformers**
+- Text explanation using **GPT-Neo (EleutherAI)**
+- Event and entity linking via **string similarity**
+- Automatic **Knowledge Graph** creation and visualization with **NetworkX** + **Matplotlib**
+
+---
+
+## ⚙️ Requirements
 ```bash
-pip install spacy scikit-learn pandas numpy networkx matplotlib
+pip install spacy scikit-learn pandas numpy sentence-transformers transformers networkx matplotlib newsapi-python python-dotenv
 python -m spacy download en_core_web_sm
 
+
+🕸️ Knowledge Graph Example
+
+The graph visualizes extracted events, entities, and their relationships.
+<p align="center"> <img src="https://raw.githubusercontent.com/miharcan/event_extraction/main/src/knowgraph/output/linked_kg.png" width="500" alt="Knowledge Graph"> </p>
