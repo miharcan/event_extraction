@@ -10,8 +10,7 @@ This project demonstrates a basic event extraction pipeline that:
 - Extracts named entities (locations, GPEs) via **spaCy**  
 - Optionally links entities using cosine similarity and builds small event graphs with **NetworkX**
 
-![Alt text](https://raw.githubusercontent.com/miharcan/event_extraction/refs/heads/main/src/knowgraph/output/linked_kg.png)
-
+![Knowledge Graph](src/knowgraph/output/linked_kg.png)
 ---
 
 ## 📦 Features
