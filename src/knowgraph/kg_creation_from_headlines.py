@@ -4,64 +4,29 @@ import requests
 import networkx as nx
 import spacy
 import matplotlib.pyplot as plt
+from dotenv import load_dotenv, dotenv_values 
+from difflib import SequenceMatcher
+import copy
+import math
+from newsapi import NewsApiClient
 
-
-# simple .env loading: prefer ../../.env, otherwise try default locations
-try:
-    from dotenv import load_dotenv
-except Exception:
-    def load_dotenv(path=None):
-        if not path or not os.path.exists(path):
-            return False
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if "=" in line:
-                        k, v = line.split("=", 1)
-                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-            return True
-        except Exception:
-            return False
-
-_env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
-if os.path.exists(_env_path):
-    load_dotenv(_env_path)
-else:
-    # try default loader (python-dotenv searches common places) or no-op fallback
-    load_dotenv()
-
-NEWSAPI_KEY = os.environ.get("NEWSAPI_KEY")
-if not NEWSAPI_KEY:
-    raise RuntimeError("NEWSAPI_KEY not found. Create a .env with NEWSAPI_KEY=your_key or set the environment variable.")
+load_dotenv()
+NEWSAPI_KEY = (os.getenv("NEWSAPI_KEY"))
 
 # ---- simple configuration ----
-QUERY = "Trump"
-SOURCES = "bbc-news,abc-news,al-jazeera-english,associated-press"
+QUERY = "Donald Trump"
+# SOURCES = "bbc-news,abc-news,al-jazeera-english,associated-press, bbc-sport"
 OUTPUT_DIR = "/home/miharc/work/code/event_extraction/src/knowgraph/output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-OUT_PATH = os.path.join(OUTPUT_DIR, "kg_headlines.png")
 
-# very small event keyword map (easy to extend)
-EVENT_KEYWORDS = {
-    "explosion": "Disaster",
-    "blast": "Disaster",
-    "protest": "Civil Unrest",
-    "demonstration": "Civil Unrest",
-    "earthquake": "Natural Disaster",
-}
+newsapi = NewsApiClient(api_key=NEWSAPI_KEY)
 
-# load spaCy once
-try:
-    nlp = spacy.load("en_core_web_sm")
-except Exception:
-    # fallback to a blank English model if the small model isn't installed;
-    # functionality will be reduced (no NER) but code stays simple.
-    nlp = spacy.blank("en")
+r = newsapi.get_sources()
+sources = [s['id'] for s in r["sources"] if s['language'] == "en"]
 
-# ---- fetching headlines (simple, clear) ----
+nlp = spacy.load("en_core_web_sm")
+
+# ---- fetching headlines  ----
 def fetch_headlines(query, sources, api_key, language="en", page_size=100):
     url = "https://newsapi.org/v2/everything"
     params = {
@@ -85,35 +50,15 @@ def fetch_headlines(query, sources, api_key, language="en", page_size=100):
         desc = a.get("description") or ""
         cont = a.get("content") or ""
         text = f"{desc} {cont}".strip()
-        # strip common bracketed noise like "[Read more]"
         text = re.sub(r"\[.*?\]", "", text).strip()
-        if text:
-            texts.append(text)
+        texts.append(text)
     return texts
-
-# ---- simple event extractor using keywords + NER entities ----
-def extract_events_and_entities(texts, keywords):
-    results = []
-    kw_items = [(k.lower(), v) for k, v in keywords.items()]
-    for t in texts:
-        low = t.lower()
-        found = sorted({label for k, label in kw_items if re.search(rf"\b{re.escape(k)}\b", low)})
-        doc = nlp(t)
-        ents = []
-        # If the model has NER, collect GPE/PERSON/ORG; otherwise collect tokens heuristically
-        if doc.ents:
-            ents = [ent.text for ent in doc.ents if ent.label_ in ("GPE", "PERSON", "ORG")]
-        else:
-            # very simple fallback: proper nouns from the sentence
-            ents = [tok.text for tok in doc if tok.pos_ == "PROPN"]
-        results.append({"headline": t, "events": found, "entities": sorted(set(ents))})
-    return results
 
 # small helper to build a short phrase for a token (compounds + token)
 def phrase_for_token(tok):
     parts = []
     for child in tok.lefts:
-        if child.dep_ in ("compound", "amod", "det"):
+        if child.dep_ in ("compound", "amod"): #, "det"):
             parts.append(child.text)
     parts.append(tok.text)
     for child in tok.rights:
@@ -138,11 +83,11 @@ def build_kg_from_texts(texts):
                     subj = None
                     obj = None
                     for ch in tok.children:
-                        if ch.dep_ in ("nsubj", "nsubjpass") and ch.pos_ in ("NOUN", "PROPN", "PRON"):
+                        if ch.dep_ in ("nsubj", "nsubjpass") and ch.pos_ in ("NOUN", "PROPN"): #, "PRON"):
                             subj = phrase_for_token(ch)
-                        if ch.dep_ in ("dobj", "obj", "pobj") and ch.pos_ in ("NOUN", "PROPN", "PRON"):
+                        if ch.dep_ in ("dobj", "obj", "pobj") and ch.pos_ in ("NOUN", "PROPN"): #, "PRON"):
                             obj = phrase_for_token(ch)
-                    # also allow prepositional object as object if no direct object
+                    ####also allow prepositional object as object if no direct object
                     if not obj:
                         for ch in tok.children:
                             if ch.dep_ == "prep":
@@ -167,15 +112,27 @@ def build_kg_from_texts(texts):
     return kg
 
 # ---- draw and save the KG with a simple layout ----
-def draw_and_save_kg(kg, out_path):
-    if kg.number_of_nodes() == 0:
-        print("No nodes to draw.")
-        return
-    plt.figure(figsize=(12, 8))
+def draw_and_save_kg(kg, out_path, name):
+    out_path = os.path.join(OUTPUT_DIR, name)
+
+    n = kg.number_of_nodes()
+    # make figure size grow with number of nodes (bounded)
+    figsize = (min(24, 6 + n * 0.25), min(18, 4 + n * 0.18))
+    plt.figure(figsize=figsize)
+
+    # choose a larger 'k' for spring_layout to spread nodes further.
+    # scale and iterations increased for more stable, spread-out layouts.
     try:
-        pos = nx.spring_layout(kg, seed=42)
+        if n > 1:
+            # k roughly proportional to sqrt(n); tune multiplier for more/less spacing
+            k = 1.5 * math.sqrt(n)
+            pos = nx.spring_layout(kg, seed=42, k=k, iterations=200, scale=2.0)
+        else:
+            # single node
+            pos = {list(kg.nodes())[0]: (0, 0)}
     except Exception:
         pos = nx.random_layout(kg, seed=42)
+
     # node colors by type attribute
     types = nx.get_node_attributes(kg, "type")
     unique = sorted(set(types.values()))
@@ -184,36 +141,141 @@ def draw_and_save_kg(kg, out_path):
     for i, t in enumerate(unique):
         color_map[t] = palette(i % 10)
     node_colors = [color_map.get(types.get(n), (0.8, 0.8, 0.8)) for n in kg.nodes()]
-    nx.draw_networkx_nodes(kg, pos, node_color=node_colors, node_size=700, alpha=0.9)
+
+    # reduce node size slightly when many nodes to avoid overlap
+    node_size = int(max(150, 800 - n * 8))
+
+    nx.draw_networkx_nodes(kg, pos, node_color=node_colors, node_size=node_size, alpha=0.95)
     nx.draw_networkx_labels(kg, pos, font_size=9)
-    nx.draw_networkx_edges(kg, pos, arrowstyle="->", arrowsize=10, edge_color="#444444")
+    nx.draw_networkx_edges(kg, pos, arrowstyle="->", arrowsize=10, edge_color="#444444", width=1.0)
     edge_labels = {(u, v): d.get("relation", "") for u, v, d in kg.edges(data=True)}
     if edge_labels:
         nx.draw_networkx_edge_labels(kg, pos, edge_labels=edge_labels, font_color="gray", font_size=7)
+
     plt.axis("off")
     plt.tight_layout()
     plt.savefig(out_path, dpi=200)
     plt.close()
     print(f"Saved KG image: {out_path}")
+    print(kg)
+    with open(f"{name}.info", "w") as file:
+        file.write(f"Built KG with {kg.number_of_nodes()} nodes and {kg.number_of_edges()} edges.\n")
+        for n, d in list(kg.nodes(data=True)):
+            file.write(f"{n}, {d}\n")
+        for u, v, d in list(kg.edges(data=True)):
+            file.write(f"{u} -[{d.get('relation')}]-> {v}\n")
+
+
+def simple_entity_linking(kg, threshold=0.8, verbose=False):
+    # only consider string node ids (guard against non-string node ids)
+    all_nodes = [n for n in kg.nodes() if isinstance(n, str)]
+    nodes_by_len = {}
+    for n in all_nodes:
+        nodes_by_len.setdefault(len(n), []).append(n)
+
+    # store/initialize merged map once
+    merged = kg.graph.setdefault("merged", {})
+
+    # sort nodes by length descending so we prefer longer 'keep' candidates
+    sorted_nodes = sorted(all_nodes, key=lambda s: len(s), reverse=True)
+
+    # compare each pair once: for i, compare with j > i
+    for i, n in enumerate(sorted_nodes):
+        if n not in kg:
+            continue
+        for n2 in sorted_nodes[i + 1 :]:
+            if n2 not in kg:
+                continue
+            if len(n) < len(n2):  # ensure outer length >= inner length
+                continue
+            if n == n2:
+                continue
+            
+            sim = SequenceMatcher(None, n.lower(), n2.lower()).ratio()
+            if sim < threshold:
+                continue
+
+            keep, remove = n, n2
+            if keep not in kg or remove not in kg or keep == remove:
+                continue
+
+            # incoming edges -> keep (merge/overwrite attributes if necessary)
+            for pred, _, data in list(kg.in_edges(remove, data=True)):
+                if pred == keep:
+                    continue
+                if kg.has_edge(pred, keep):
+                    kg[pred][keep].update(data)
+                else:
+                    kg.add_edge(pred, keep, **data)
+
+            # outgoing edges from remove -> keep
+            for _, succ, data in list(kg.out_edges(remove, data=True)):
+                if succ == keep:
+                    continue
+                if kg.has_edge(keep, succ):
+                    kg[keep][succ].update(data)
+                else:
+                    kg.add_edge(keep, succ, **data)
+
+            # merge node attributes: keep wins, but copy missing attrs from remove
+            attrs_keep = dict(kg.nodes[keep])
+            attrs_remove = dict(kg.nodes[remove])
+
+            # special handling for "type" key: concatenate if different
+            t_keep = attrs_keep.get("type")
+            t_remove = attrs_remove.get("type")
+            if t_keep and t_remove and t_keep != t_remove:
+                attrs_keep["type"] = f"{t_keep}|{t_remove}"
+            elif not t_keep and t_remove:
+                attrs_keep["type"] = t_remove
+
+            # copy any attributes from remove that keep does not have
+            for k_attr, v_attr in attrs_remove.items():
+                if k_attr not in attrs_keep:
+                    attrs_keep[k_attr] = v_attr
+
+            kg.nodes[keep].update(attrs_keep)
+
+            # record merge and remove node
+            merged[remove] = {"merged_into": keep, "sim": round(sim, 3)}
+            try:
+                kg.remove_node(remove)
+            except Exception as ex:
+                # don't silently swallow errors - keepable for debugging or real handling
+                if verbose:
+                    print(f"Failed to remove node {remove}: {ex}")
+            kg.graph["merged"] = merged
+            print(f"Merged '{remove}' -> '{keep}' (sim={sim:.2f})")
+
+    return merged
 
 # ---- main flow ----
 def main():
-    texts = fetch_headlines(QUERY, SOURCES, NEWSAPI_KEY)
+    texts = fetch_headlines(QUERY, ", ".join(sources), NEWSAPI_KEY)
     if not texts:
         print("No articles fetched.")
         return
-    events = extract_events_and_entities(texts, EVENT_KEYWORDS)
-    for e in events:
-        if e["events"]:
-            print("Detected events:", e["events"], "Entities:", e["entities"])
     kg = build_kg_from_texts(texts)
-    print(f"Built KG with {kg.number_of_nodes()} nodes and {kg.number_of_edges()} edges.")
-    # small sample printouts
-    for n, d in list(kg.nodes(data=True))[:20]:
-        print(n, d)
-    for u, v, d in list(kg.edges(data=True))[:20]:
-        print(f"{u} -[{d.get('relation')}]-> {v}")
-    draw_and_save_kg(kg, OUT_PATH)
+    
+    kg_linked = kg.copy()
+    entity_linked = simple_entity_linking(kg_linked)
+
+    if entity_linked:
+        canonical_map = kg_linked.graph.setdefault("canonical_map", {})
+        for removed, info in entity_linked.items():
+            keep = info.get("merged_into")
+            if not keep:
+                continue
+            canonical_map[removed] = keep
+            if keep in kg_linked:
+                aliases = kg_linked.nodes[keep].setdefault("aliases", [])
+                if removed not in aliases:
+                    aliases.append(removed)
+        kg_linked.graph["canonical_map"] = canonical_map
+    else:
+        kg_linked.graph.setdefault("canonical_map", {})
+    draw_and_save_kg(kg, OUTPUT_DIR, "original_kg.png")
+    draw_and_save_kg(kg_linked, OUTPUT_DIR, "linked_kg.png")
 
 if __name__ == "__main__":
     main()
