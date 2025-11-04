@@ -32,4 +32,4 @@ python -m spacy download en_core_web_sm
 🕸️ Knowledge Graph Example
 
 The graph visualizes extracted events, entities, and their relationships.
-<p align="center"> <img src="https://raw.githubusercontent.com/miharcan/event_extraction/main/src/knowgraph/output/linked_kg.png" width="500" alt="Knowledge Graph"> </p>
+![Knowledge Graph](https://raw.githubusercontent.com/miharcan/event_extraction/main/src/knowgraph/output/linked_kg.png)
