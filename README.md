@@ -1,4 +1,4 @@
-# 🧠 Event Extraction & Knowledge Graph Builder
+# Event Extraction & Knowledge Graph Builder
 
 This project demonstrates lightweight NLP methods for detecting events, linking entities, and visualizing relationships from text or news data.
 
@@ -14,7 +14,7 @@ The codebase combines three main components:
 
 ---
 
-## 🧩 Features
+## Features
 - Named Entity Recognition (NER) via **spaCy**
 - Semantic similarity with **SentenceTransformers**
 - Text explanation using **GPT-Neo (EleutherAI)**
@@ -23,13 +23,7 @@ The codebase combines three main components:
 
 ---
 
-## ⚙️ Requirements
-```bash
-pip install spacy scikit-learn pandas numpy sentence-transformers transformers networkx matplotlib newsapi-python python-dotenv
-python -m spacy download en_core_web_sm
-
-
-🕸️ Knowledge Graph Example
+# Knowledge Graph Example
 
 The graph visualizes extracted events, entities, and their relationships.
 ![Knowledge Graph](https://raw.githubusercontent.com/miharcan/event_extraction/main/src/knowgraph/output/linked_kg.png)
