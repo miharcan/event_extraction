@@ -30,8 +30,6 @@ sources = [s['id'] for s in r["sources"] if s['language'] == "en"]
 nlp = spacy.load("en_core_web_sm")
 
 QUERY = ""
-# GET https://newsapi.org/v2/top-headlines?country=us&apiKey=34d1936418414b60b6f11621ad094523
-# ---- fetching headlines  ----
 # def fetch_headlines(query, sources, api_key, language="en", page_size=10):
 def fetch_headlines(query, sources, api_key, language="en", page_size=100):
     url = "https://newsapi.org/v2/top-headlines"
