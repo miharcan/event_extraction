@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 load_dotenv()
 NEWSAPI_KEY = (os.getenv("NEWSAPI_KEY"))
 
-OUTPUT_DIR = "/home/miharc/work/code/event_extraction/src/knowgraph/output"
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 newsapi = NewsApiClient(api_key=NEWSAPI_KEY)
@@ -253,7 +253,6 @@ def kg_visualisation(kg1, kg2):
         out_path = os.path.join(OUTPUT_DIR, outname)
         plt.savefig(out_path, dpi=200)
         print(f"Saved KG visualization to {out_path}")
-        plt.show()
         plt.close()
 
     # draw each KG independently

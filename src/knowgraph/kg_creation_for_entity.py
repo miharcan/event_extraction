@@ -10,14 +10,19 @@ import copy
 import math
 from newsapi import NewsApiClient
 
+import os
+
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
 load_dotenv()
 NEWSAPI_KEY = (os.getenv("NEWSAPI_KEY"))
 
 # ---- simple configuration ----
 QUERY = "Luka Doncic"
 # SOURCES = "bbc-news,abc-news,al-jazeera-english,associated-press, bbc-sport"
-OUTPUT_DIR = "/home/miharc/work/code/event_extraction/src/knowgraph/output"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 
 newsapi = NewsApiClient(api_key=NEWSAPI_KEY)
 
@@ -160,7 +165,7 @@ def draw_and_save_kg(kg, out_path, name):
     plt.close()
     print(f"Saved KG image: {out_path}")
     print(kg)
-    with open(f"output/{name}.info", "w") as file:
+    with open(f"{out_path}.info", "w") as file:
         file.write(f"Built KG with {kg.number_of_nodes()} nodes and {kg.number_of_edges()} edges.\n")
         for n, d in list(kg.nodes(data=True)):
             file.write(f"{n}, {d}\n")
@@ -276,7 +281,6 @@ def main():
         kg_linked.graph["canonical_map"] = canonical_map
     else:
         kg_linked.graph.setdefault("canonical_map", {})
-    # draw_and_save_kg(kg, OUTPUT_DIR, "kg.png")
     draw_and_save_kg(kg_linked, OUTPUT_DIR, "kg_for_entity.png")
 
 if __name__ == "__main__":

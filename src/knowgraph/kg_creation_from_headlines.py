@@ -15,8 +15,8 @@ NEWSAPI_KEY = (os.getenv("NEWSAPI_KEY"))
 
 # ---- simple configuration ----
 QUERY = "Donald Trump"
-# SOURCES = "bbc-news,abc-news,al-jazeera-english,associated-press, bbc-sport"
-OUTPUT_DIR = "/home/miharc/work/code/event_extraction/src/knowgraph/output"
+
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 newsapi = NewsApiClient(api_key=NEWSAPI_KEY)

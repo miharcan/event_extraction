@@ -1,3 +1,6 @@
+src/knowgraph/output/*.png
+src/knowgraph/output/*.rdf
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

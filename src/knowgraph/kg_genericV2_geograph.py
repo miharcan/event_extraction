@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta
 from deep_translator import GoogleTranslator
 
-OUTPUT_DIR = "/home/miharc/work/code/event_extraction/src/knowgraph/output"
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 load_dotenv()

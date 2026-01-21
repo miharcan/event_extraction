@@ -1,71 +1,79 @@
-import pandas as pd
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.feature_extraction.text import TfidfVectorizer
-from transformers import pipeline
+from __future__ import annotations
+
+import argparse
 import re
+from typing import List, Optional
+
 import numpy as np
-import spacy
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
 
-#python -m spacy download en_core_web_sm
-nlp = spacy.load("en_core_web_sm")
 
-# Sample humanitarian event texts
-data = [
+SAMPLE_DATA = [
     {"id": 1, "text": "Armed clashes reported between groups in Khartoum, Sudan."},
     {"id": 2, "text": "Floods displaced thousands in Mogadishu, Somalia."},
-    {"id": 3, "text": "Food aid distributed to refugee camps near Addis Ababa."},
-    {"id": 4, "text": "Ceasefire negotiations begin between rebel and government forces in Sudan."},
-    {"id": 5, "text": "Medical supplies shortage reported after conflict escalation in Darfur."}
+    {"id": 3, "text": "A cyclone caused widespread damage along the coast of Mozambique."},
+    {"id": 4, "text": "Earthquake tremors felt in northern Turkey; buildings evacuated."},
+    {"id": 5, "text": "Protesters gathered in the capital demanding political reforms."},
 ]
 
-query = ["conflict events in Sudan"]
 
-df = pd.DataFrame(data)
+def _rank_by_embeddings(texts: List[str], query: str, model_name: str) -> np.ndarray:
+    """Return cosine similarity scores using SentenceTransformers."""
+    from sentence_transformers import SentenceTransformer  # heavy import
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
-data_embeddings = model.encode(df['text'], normalize_embeddings = True)
-query_embedding = model.encode(query, normalize_embeddings = True)
-
-df['cosine score data query'] = cosine_similarity(query_embedding, data_embeddings).flatten()
-# print(df.sort_values(by="score", ascending=False))
+    model = SentenceTransformer(model_name)
+    query_emb = model.encode([query], normalize_embeddings=True)
+    text_emb = model.encode(texts, normalize_embeddings=True)
+    return cosine_similarity(query_emb, text_emb)[0]
 
 
-##Explaination
-explainer = pipeline("text-generation", model="EleutherAI/gpt-neo-125M")
-def explain_similarity(query, text):
+def _explain_relevance(query: str, text: str, hf_model: str, max_new_tokens: int = 120) -> str:
+    """Generate a short explanation via a HuggingFace text-generation pipeline."""
+    from transformers import pipeline  # heavy import
+
+    explainer = pipeline("text-generation", model=hf_model)
     prompt = f"Explain why the following text is relevant to '{query}':\n\n{text}\n\nExplanation:"
-    return explainer(prompt, max_new_tokens=100, num_return_sequences=1)[0]['generated_text']
+    out = explainer(prompt, max_new_tokens=max_new_tokens, num_return_sequences=1)[0]["generated_text"]
+    out = re.sub(r"\s+", " ", out).strip()
+    m = re.search(r"Explanation:(.*)", out)
+    return (m.group(1).strip() if m else out)
 
-explain_lst = []
-for i in range(len(df)):
-    explain = explain_similarity(query[0], df.loc[i, "text"])
-    explain = re.sub(r"\n", " ", explain)
-    explain = re.sub(r"  ", " ", explain)
-    explain = re.search(r'Explanation:(.+)', explain).group(1)
-    explain_lst.append(explain)
-df["explanation"] = explain_lst
 
-expl_embs = model.encode(explain_lst, normalize_embeddings=True)
-df["cosine similarity query explanation"] = cosine_similarity(query_embedding,expl_embs).flatten()
+def main(argv: Optional[List[str]] = None) -> int:
+    p = argparse.ArgumentParser(description="Semantic ranking of short event texts (with optional explanations).")
 
-#Entity Extraction
-events = []
-entities = []
-for text in df["text"]:
-    if "conflict" in text:
-        events.append("conflict")
-    else:
-        events.append("NA")
-    doc = nlp(text)
-    ent_tmp = []
-    for ent in doc.ents:
-        if ent.label_ == "GPE":
-            ent_tmp.append(ent.text)
-    if not ent_tmp:
-        ent_tmp.append(["NA"])
-    entities.append(ent_tmp)
+    p.add_argument("--query", required=True, help="Search query, e.g. 'flood displacement'.")
+    p.add_argument("--top-k", type=int, default=5, help="How many results to show.")
+    p.add_argument("--no-explain", action="store_true", help="Disable explanation generation.")
+    p.add_argument(
+        "--embedding-model",
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        help="SentenceTransformers model name.",
+    )
+    p.add_argument(
+        "--explain-model",
+        default="EleutherAI/gpt-neo-125M",
+        help="HuggingFace text-generation model name used for explanations.",
+    )
 
-df["events"] = events
-df["entities"] = entities
-print(df)
+    args = p.parse_args(argv)
+
+    df = pd.DataFrame(SAMPLE_DATA)
+    texts = df["text"].tolist()
+
+    scores = _rank_by_embeddings(texts, args.query, args.embedding_model)
+    df["score"] = scores
+    df = df.sort_values("score", ascending=False).head(args.top_k).reset_index(drop=True)
+
+    if not args.no_explain:
+        df["explanation"] = [
+            _explain_relevance(args.query, t, args.explain_model) for t in df["text"].tolist()
+        ]
+
+    print(df.to_string(index=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
